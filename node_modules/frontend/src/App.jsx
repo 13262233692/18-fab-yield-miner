@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Sidebar from './components/Sidebar.jsx';
 import WaferMap from './components/WaferMap.jsx';
+import OverlapAnalysisPanel from './components/OverlapAnalysisPanel.jsx';
 import {
   generateMockDefects,
   getMockWafers,
@@ -17,6 +18,7 @@ export default function App() {
   const [clusters, setClusters] = useState([]);
   const [pickedDefect, setPickedDefect] = useState(null);
   const [mockMode, setMockMode] = useState(false);
+  const [showOverlapPanel, setShowOverlapPanel] = useState(false);
   const mockDefectsRef = useRef(null);
 
   const loadBatches = useCallback(async () => {
@@ -182,6 +184,11 @@ export default function App() {
     console.log('Selected cluster:', cluster);
   };
 
+  const handleStartOverlapAnalysis = () => {
+    setShowOverlapPanel(true);
+    setPickedDefect(null);
+  };
+
   return (
     <div className="app">
       <Sidebar
@@ -195,63 +202,76 @@ export default function App() {
         clusters={clusters}
         onSelectCluster={handleSelectCluster}
         onGenerateSample={handleGenerateSample}
+        onStartOverlapAnalysis={handleStartOverlapAnalysis}
       />
 
-      <div style={{ flex: 1, position: 'relative' }}>
-        {selectedBatch ? (
-          <WaferMap
-            batchId={selectedBatch.id}
-            waferId={selectedWafer}
-            onDefectPick={handleDefectPick}
-            mockDefects={mockMode ? mockDefectsRef.current : null}
+      <div style={{ flex: 1, position: 'relative', display: 'flex' }}>
+        <div style={{ flex: 1, position: 'relative' }}>
+          {selectedBatch ? (
+            <WaferMap
+              batchId={selectedBatch.id}
+              waferId={selectedWafer}
+              onDefectPick={handleDefectPick}
+              mockDefects={mockMode ? mockDefectsRef.current : null}
+            />
+          ) : (
+            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+              <div style={{ textAlign: 'center', color: '#8b949e' }}>
+                <div style={{ fontSize: 48, marginBottom: 16 }}>🔬</div>
+                <h2 style={{ color: '#c9d1d9', marginBottom: 8 }}>晶圆缺陷空间分析系统</h2>
+                <p>请先选择一个批次或上传晶圆坐标数据</p>
+              </div>
+            </div>
+          )}
+
+          {pickedDefect && pickedDefect.defects.length > 0 && (
+            <div className="defect-detail">
+              <strong>📍 拾取位置</strong>
+              <div style={{ marginTop: 6 }}>
+                坐标: ({pickedDefect.position.x.toFixed(2)}, {pickedDefect.position.y.toFixed(2)}) mm
+              </div>
+              <div>附近缺陷数: {pickedDefect.defects.length}</div>
+              {pickedDefect.defects[0]?.wafer_id && (
+                <div>晶圆: {pickedDefect.defects[0].wafer_id}</div>
+              )}
+              {pickedDefect.defects[0]?.waferId && (
+                <div>晶圆: {pickedDefect.defects[0].waferId}</div>
+              )}
+              {pickedDefect.defects[0]?.defectClass && (
+                <div>类型: {pickedDefect.defects[0].defectClass}</div>
+              )}
+              {pickedDefect.defects[0]?.size && (
+                <div>尺寸: {pickedDefect.defects[0].size.toFixed(3)} μm</div>
+              )}
+            </div>
+          )}
+
+          {mockMode && (
+            <div style={{
+              position: 'absolute',
+              top: 16,
+              left: 16,
+              background: 'rgba(240, 136, 62, 0.2)',
+              border: '1px solid #f0883e',
+              borderRadius: 6,
+              padding: '6px 12px',
+              fontSize: 12,
+              color: '#f0883e',
+              zIndex: 10,
+            }}>
+              ⚠️ 演示模式 - 使用本地模拟数据
+            </div>
+          )}
+        </div>
+
+        {showOverlapPanel && selectedBatch && (
+          <OverlapAnalysisPanel
+            batch={selectedBatch}
+            wafers={wafers}
+            mockMode={mockMode}
+            mockDefects={mockDefectsRef.current}
+            onClose={() => setShowOverlapPanel(false)}
           />
-        ) : (
-          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <div style={{ textAlign: 'center', color: '#8b949e' }}>
-              <div style={{ fontSize: 48, marginBottom: 16 }}>🔬</div>
-              <h2 style={{ color: '#c9d1d9', marginBottom: 8 }}>晶圆缺陷空间分析系统</h2>
-              <p>请先选择一个批次或上传晶圆坐标数据</p>
-            </div>
-          </div>
-        )}
-
-        {pickedDefect && pickedDefect.defects.length > 0 && (
-          <div className="defect-detail">
-            <strong>📍 拾取位置</strong>
-            <div style={{ marginTop: 6 }}>
-              坐标: ({pickedDefect.position.x.toFixed(2)}, {pickedDefect.position.y.toFixed(2)}) mm
-            </div>
-            <div>附近缺陷数: {pickedDefect.defects.length}</div>
-            {pickedDefect.defects[0]?.wafer_id && (
-              <div>晶圆: {pickedDefect.defects[0].wafer_id}</div>
-            )}
-            {pickedDefect.defects[0]?.waferId && (
-              <div>晶圆: {pickedDefect.defects[0].waferId}</div>
-            )}
-            {pickedDefect.defects[0]?.defectClass && (
-              <div>类型: {pickedDefect.defects[0].defectClass}</div>
-            )}
-            {pickedDefect.defects[0]?.size && (
-              <div>尺寸: {pickedDefect.defects[0].size.toFixed(3)} μm</div>
-            )}
-          </div>
-        )}
-
-        {mockMode && (
-          <div style={{
-            position: 'absolute',
-            top: 16,
-            left: 16,
-            background: 'rgba(240, 136, 62, 0.2)',
-            border: '1px solid #f0883e',
-            borderRadius: 6,
-            padding: '6px 12px',
-            fontSize: 12,
-            color: '#f0883e',
-            zIndex: 10,
-          }}>
-            ⚠️ 演示模式 - 使用本地模拟数据
-          </div>
         )}
       </div>
     </div>

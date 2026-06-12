@@ -11,6 +11,7 @@ export default function Sidebar({
   clusters,
   onSelectCluster,
   onGenerateSample,
+  onStartOverlapAnalysis,
 }) {
   const fileInputRef = React.useRef(null);
 
@@ -75,6 +76,24 @@ export default function Sidebar({
 
       {selectedBatch && (
         <>
+          <button
+            onClick={onStartOverlapAnalysis}
+            style={{
+              width: '100%',
+              padding: '10px',
+              background: '#8957e5',
+              border: 'none',
+              borderRadius: 6,
+              color: 'white',
+              fontSize: 13,
+              cursor: 'pointer',
+              marginTop: 4,
+              marginBottom: 12,
+            }}
+          >
+            🔬 晶圆缺陷重叠分析
+          </button>
+
           <h3>晶圆选择</h3>
           <div className="wafer-tabs">
             <div
