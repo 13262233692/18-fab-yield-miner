@@ -6,7 +6,56 @@ const TILE_RESOLUTION = 200;
 const MIN_ZOOM = 0.5;
 const MAX_ZOOM = 50;
 
-export default function WaferMap({ batchId, waferId, onDefectPick, onViewChange, mockDefects = null }) {
+function getScratchColor(scratch) {
+  let severity = 'INFO';
+  if (typeof scratch.severity === 'string') {
+    severity = scratch.severity;
+  } else if (typeof scratch.confidence === 'number') {
+    if (scratch.confidence >= 0.8) severity = 'CRITICAL';
+    else if (scratch.confidence >= 0.6) severity = 'WARNING';
+    else severity = 'MILD';
+  }
+  switch (severity) {
+    case 'CRITICAL':
+      return { line: '#ff1744', glow: 'rgba(255, 23, 68, 0.8)', label: 'CRITICAL' };
+    case 'WARNING':
+      return { line: '#ff9100', glow: 'rgba(255, 145, 0, 0.7)', label: 'WARNING' };
+    case 'MILD':
+      return { line: '#ffc400', glow: 'rgba(255, 196, 0, 0.5)', label: 'MILD' };
+    default:
+      return { line: '#ffc107', glow: 'rgba(255, 193, 7, 0.5)', label: 'INFO' };
+  }
+}
+
+function isHighConfidence(scratch) {
+  if (typeof scratch.severity === 'string') {
+    return scratch.severity === 'CRITICAL';
+  }
+  return (scratch.confidence || 0) >= 0.8;
+}
+
+function isMediumConfidence(scratch) {
+  if (typeof scratch.severity === 'string') {
+    return scratch.severity === 'WARNING';
+  }
+  return (scratch.confidence || 0) >= 0.6 && (scratch.confidence || 0) < 0.8;
+}
+
+function getLineEquation(scratch) {
+  if (scratch.lineEquation) return scratch.lineEquation;
+  return { a: scratch.a || 0, b: scratch.b || 0, c: scratch.c || 0 };
+}
+
+export default function WaferMap({
+  batchId,
+  waferId,
+  onDefectPick,
+  onViewChange,
+  mockDefects = null,
+  scratchLines = [],
+  showScratches = true,
+  onScratchClick,
+}) {
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
   const viewRef = useRef({
@@ -195,54 +244,134 @@ export default function WaferMap({ batchId, waferId, onDefectPick, onViewChange,
     }
 
     const defects = await fetchTileData();
-    if (!defects || defects.length === 0) {
+    if (defects && defects.length > 0) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(center.x, center.y, radiusPx, 0, Math.PI * 2);
+      ctx.clip();
+
+      const maxCount = Math.max(...defects.map((d) => d.count), 1);
+
+      defects.forEach((defect) => {
+        const pos = worldToScreen(defect.x, defect.y);
+        const intensity = Math.min(1, defect.count / maxCount);
+        const size = Math.max(0.5, Math.min(8, (defect.avgSize || 1) * v.zoom * 0.8));
+
+        let r, g, b, a;
+        if (intensity > 0.7) {
+          r = 255;
+          g = Math.floor(80 + (1 - intensity) * 50);
+          b = Math.floor(50 + (1 - intensity) * 30);
+          a = 0.7 + intensity * 0.3;
+        } else if (intensity > 0.3) {
+          r = Math.floor(200 + intensity * 55);
+          g = Math.floor(120 + intensity * 30);
+          b = Math.floor(80 + intensity * 20);
+          a = 0.4 + intensity * 0.3;
+        } else {
+          r = Math.floor(120 + intensity * 80);
+          g = Math.floor(120 + intensity * 30);
+          b = Math.floor(120 - intensity * 40);
+          a = 0.2 + intensity * 0.3;
+        }
+
+        ctx.beginPath();
+        ctx.arc(pos.x, pos.y, size, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${a})`;
+        ctx.fill();
+
+        if (intensity > 0.6 && v.zoom > 5) {
+          ctx.strokeStyle = `rgba(255, 220, 150, ${intensity * 0.4})`;
+          ctx.lineWidth = 0.8;
+          ctx.stroke();
+        }
+      });
+
       ctx.restore();
-      return;
     }
 
-    ctx.save();
-    ctx.beginPath();
-    ctx.arc(center.x, center.y, radiusPx, 0, Math.PI * 2);
-    ctx.clip();
-
-    const maxCount = Math.max(...defects.map((d) => d.count), 1);
-
-    defects.forEach((defect) => {
-      const pos = worldToScreen(defect.x, defect.y);
-      const intensity = Math.min(1, defect.count / maxCount);
-      const size = Math.max(0.5, Math.min(8, (defect.avgSize || 1) * v.zoom * 0.8));
-
-      let r, g, b, a;
-      if (intensity > 0.7) {
-        r = 255;
-        g = Math.floor(80 + (1 - intensity) * 50);
-        b = Math.floor(50 + (1 - intensity) * 30);
-        a = 0.7 + intensity * 0.3;
-      } else if (intensity > 0.3) {
-        r = Math.floor(200 + intensity * 55);
-        g = Math.floor(120 + intensity * 30);
-        b = Math.floor(80 + intensity * 20);
-        a = 0.4 + intensity * 0.3;
-      } else {
-        r = Math.floor(120 + intensity * 80);
-        g = Math.floor(120 + intensity * 30);
-        b = Math.floor(120 - intensity * 40);
-        a = 0.2 + intensity * 0.3;
-      }
-
+    if (showScratches && scratchLines && scratchLines.length > 0) {
+      ctx.save();
       ctx.beginPath();
-      ctx.arc(pos.x, pos.y, size, 0, Math.PI * 2);
-      ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${a})`;
-      ctx.fill();
+      ctx.arc(center.x, center.y, radiusPx, 0, Math.PI * 2);
+      ctx.clip();
 
-      if (intensity > 0.6 && v.zoom > 5) {
-        ctx.strokeStyle = `rgba(255, 220, 150, ${intensity * 0.4})`;
-        ctx.lineWidth = 0.8;
+      scratchLines.forEach((scratch) => {
+        const startP = worldToScreen(scratch.startX, scratch.startY);
+        const endP = worldToScreen(scratch.endX, scratch.endY);
+        const colors = getScratchColor(scratch);
+
+        const midX = (startP.x + endP.x) / 2;
+        const midY = (startP.y + endP.y) / 2;
+        const dx = endP.x - startP.x;
+        const dy = endP.y - startP.y;
+        const len = Math.sqrt(dx * dx + dy * dy);
+        const extendFactor = 1.15;
+        const extX = len > 0 ? (dx / len) * len * (extendFactor - 1) / 2 : 0;
+        const extY = len > 0 ? (dy / len) * len * (extendFactor - 1) / 2 : 0;
+        const sx = startP.x - extX;
+        const sy = startP.y - extY;
+        const ex = endP.x + extX;
+        const ey = endP.y + extY;
+
+        ctx.shadowColor = colors.glow;
+        ctx.shadowBlur = isHighConfidence(scratch) ? 25 : isMediumConfidence(scratch) ? 15 : 8;
+
+        ctx.strokeStyle = colors.line;
+        ctx.lineWidth = isHighConfidence(scratch)
+          ? Math.max(3.5, 3.5 * Math.min(v.zoom / 2, 3))
+          : isMediumConfidence(scratch)
+            ? Math.max(2.5, 2.5 * Math.min(v.zoom / 2.5, 2.5))
+            : Math.max(1.8, 1.8 * Math.min(v.zoom / 3, 2));
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+
+        ctx.beginPath();
+        ctx.moveTo(sx, sy);
+        ctx.lineTo(ex, ey);
         ctx.stroke();
-      }
-    });
 
-    ctx.restore();
+        ctx.shadowBlur = 0;
+
+        if (isHighConfidence(scratch) && v.zoom > 2 && len > 0) {
+          const nLines = 3;
+          for (let i = 1; i <= nLines; i++) {
+            ctx.strokeStyle = colors.line;
+            ctx.globalAlpha = 0.15 / i;
+            ctx.lineWidth = Math.max(1, ctx.lineWidth / (i + 0.5));
+            const offset = i * 4;
+            const nx = -dy / len * offset;
+            const ny = dx / len * offset;
+
+            ctx.beginPath();
+            ctx.moveTo(sx + nx, sy + ny);
+            ctx.lineTo(ex + nx, ey + ny);
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.moveTo(sx - nx, sy - ny);
+            ctx.lineTo(ex - nx, ey - ny);
+            ctx.stroke();
+          }
+          ctx.globalAlpha = 1;
+        }
+
+        if (v.zoom > 4) {
+          const labelX = midX;
+          const labelY = midY - 14;
+          ctx.font = isHighConfidence(scratch) ? 'bold 11px sans-serif' : '10px sans-serif';
+          const label = `⚡ ${colors.label} ${scratch.waferId || ''}`;
+          const textWidth = ctx.measureText(label).width;
+          ctx.fillStyle = 'rgba(10, 14, 20, 0.85)';
+          ctx.fillRect(labelX - textWidth / 2 - 5, labelY - 10, textWidth + 10, 14);
+          ctx.fillStyle = colors.line;
+          ctx.textAlign = 'center';
+          ctx.fillText(label, labelX, labelY);
+        }
+      });
+
+      ctx.restore();
+    }
 
     ctx.strokeStyle = '#30363d';
     ctx.lineWidth = 2;
@@ -265,7 +394,7 @@ export default function WaferMap({ batchId, waferId, onDefectPick, onViewChange,
     ctx.fillText(`${(WAFER_RADIUS_MM * 2).toFixed(0)}mm`, center.x + radiusPx + 8, center.y + 4);
 
     ctx.restore();
-  }, [canvasSize, worldToScreen, fetchTileData]);
+  }, [canvasSize, worldToScreen, fetchTileData, scratchLines, showScratches]);
 
   const requestRender = useCallback(() => {
     if (animFrameRef.current) {
@@ -277,7 +406,7 @@ export default function WaferMap({ batchId, waferId, onDefectPick, onViewChange,
   useEffect(() => {
     defectsCacheRef.current.clear();
     requestRender();
-  }, [batchId, waferId, mockDefects, requestRender]);
+  }, [batchId, waferId, mockDefects, scratchLines, showScratches, requestRender]);
 
   const handleMouseDown = (e) => {
     isDraggingRef.current = true;
@@ -335,6 +464,18 @@ export default function WaferMap({ batchId, waferId, onDefectPick, onViewChange,
 
     const distFromCenter = Math.sqrt(world.x ** 2 + world.y ** 2);
     if (distFromCenter > WAFER_RADIUS_MM) return;
+
+    if (scratchLines && scratchLines.length > 0 && onScratchClick) {
+      for (const scratch of scratchLines) {
+        const { a, b, c } = getLineEquation(scratch);
+        if (a === 0 && b === 0) continue;
+        const dist = Math.abs(a * world.x + b * world.y + c) / Math.sqrt(a * a + b * b);
+        if (dist <= 2.0) {
+          onScratchClick(scratch);
+          return;
+        }
+      }
+    }
 
     const pickRadius = 3 / viewRef.current.zoom;
 
@@ -428,6 +569,12 @@ export default function WaferMap({ batchId, waferId, onDefectPick, onViewChange,
           <span className="label">晶圆</span>
           <span className="value">{waferId || '全部'}</span>
         </div>
+        {scratchLines && scratchLines.length > 0 && (
+          <div className="row">
+            <span className="label">⚡ 划痕</span>
+            <span className="value" style={{ color: '#ff1a1a' }}>{scratchLines.length}</span>
+          </div>
+        )}
       </div>
 
       <div className="legend">
@@ -444,6 +591,24 @@ export default function WaferMap({ batchId, waferId, onDefectPick, onViewChange,
           <div className="legend-dot" style={{ background: 'rgba(120, 120, 120, 0.4)' }}></div>
           <span>低密度</span>
         </div>
+        {scratchLines && scratchLines.length > 0 && (
+          <>
+            <div style={{ height: 1, background: '#30363d', margin: '8px 0' }}></div>
+            <div style={{ fontWeight: 500, marginBottom: 6, color: '#c9d1d9' }}>划痕告警</div>
+            <div className="legend-item">
+              <div style={{ width: 16, height: 3, background: '#ff1a1a', boxShadow: '0 0 6px #ff1a1a', borderRadius: 2 }}></div>
+              <span>严重</span>
+            </div>
+            <div className="legend-item">
+              <div style={{ width: 16, height: 3, background: '#ff6b35', boxShadow: '0 0 4px #ff6b35', borderRadius: 2 }}></div>
+              <span>警告</span>
+            </div>
+            <div className="legend-item">
+              <div style={{ width: 16, height: 3, background: '#ffc107', boxShadow: '0 0 3px #ffc107', borderRadius: 2 }}></div>
+              <span>提示</span>
+            </div>
+          </>
+        )}
       </div>
 
       {isLoading && <div className="loading">加载中...</div>}

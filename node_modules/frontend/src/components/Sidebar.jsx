@@ -12,6 +12,7 @@ export default function Sidebar({
   onSelectCluster,
   onGenerateSample,
   onStartOverlapAnalysis,
+  onStartScratchDetection,
 }) {
   const fileInputRef = React.useRef(null);
 
@@ -88,10 +89,30 @@ export default function Sidebar({
               fontSize: 13,
               cursor: 'pointer',
               marginTop: 4,
-              marginBottom: 12,
+              marginBottom: 6,
             }}
           >
             🔬 晶圆缺陷重叠分析
+          </button>
+
+          <button
+            onClick={onStartScratchDetection}
+            style={{
+              width: '100%',
+              padding: '10px',
+              background: '#da3633',
+              border: 'none',
+              borderRadius: 6,
+              color: 'white',
+              fontSize: 13,
+              cursor: 'pointer',
+              marginTop: 4,
+              marginBottom: 12,
+              fontWeight: 600,
+              boxShadow: '0 0 12px rgba(218,54,51,0.35)',
+            }}
+          >
+            ⚡ Radon 划痕检测
           </button>
 
           <h3>晶圆选择</h3>

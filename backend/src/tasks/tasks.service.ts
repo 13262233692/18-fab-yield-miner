@@ -146,7 +146,7 @@ export class TasksService {
     });
   }
 
-  async getResult(taskId: string): Promise<AnalysisResult | null> {
+  async getResult<T = any>(taskId: string): Promise<T | null> {
     const raw = await this.redis.get(TASK_RESULT_PREFIX + taskId);
     if (!raw) return null;
     try {
@@ -156,7 +156,7 @@ export class TasksService {
     }
   }
 
-  async saveResult(taskId: string, result: AnalysisResult): Promise<void> {
+  async saveResult(taskId: string, result: any): Promise<void> {
     await this.redis.setex(TASK_RESULT_PREFIX + taskId, TASK_TTL, JSON.stringify(result));
   }
 

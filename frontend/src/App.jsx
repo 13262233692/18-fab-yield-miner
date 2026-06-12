@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Sidebar from './components/Sidebar.jsx';
 import WaferMap from './components/WaferMap.jsx';
 import OverlapAnalysisPanel from './components/OverlapAnalysisPanel.jsx';
+import ScratchDetectionPanel from './components/ScratchDetectionPanel.jsx';
 import {
   generateMockDefects,
   getMockWafers,
@@ -19,6 +20,9 @@ export default function App() {
   const [pickedDefect, setPickedDefect] = useState(null);
   const [mockMode, setMockMode] = useState(false);
   const [showOverlapPanel, setShowOverlapPanel] = useState(false);
+  const [showScratchPanel, setShowScratchPanel] = useState(false);
+  const [scratchLines, setScratchLines] = useState([]);
+  const [scratchAlerts, setScratchAlerts] = useState([]);
   const mockDefectsRef = useRef(null);
 
   const loadBatches = useCallback(async () => {
@@ -186,7 +190,18 @@ export default function App() {
 
   const handleStartOverlapAnalysis = () => {
     setShowOverlapPanel(true);
+    setShowScratchPanel(false);
     setPickedDefect(null);
+  };
+
+  const handleStartScratchDetection = () => {
+    setShowScratchPanel(true);
+    setShowOverlapPanel(false);
+    setPickedDefect(null);
+  };
+
+  const handleApplyScratches = (lines) => {
+    setScratchLines(lines || []);
   };
 
   return (
@@ -203,6 +218,7 @@ export default function App() {
         onSelectCluster={handleSelectCluster}
         onGenerateSample={handleGenerateSample}
         onStartOverlapAnalysis={handleStartOverlapAnalysis}
+        onStartScratchDetection={handleStartScratchDetection}
       />
 
       <div style={{ flex: 1, position: 'relative', display: 'flex' }}>
@@ -213,6 +229,8 @@ export default function App() {
               waferId={selectedWafer}
               onDefectPick={handleDefectPick}
               mockDefects={mockMode ? mockDefectsRef.current : null}
+              scratchLines={scratchLines}
+              showScratches={true}
             />
           ) : (
             <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
@@ -262,6 +280,38 @@ export default function App() {
               ⚠️ 演示模式 - 使用本地模拟数据
             </div>
           )}
+
+          {scratchLines.length > 0 && (
+            <div style={{
+              position: 'absolute',
+              top: 16,
+              right: 16,
+              background: 'rgba(248,81,73,0.15)',
+              border: '1px solid #f85149',
+              borderRadius: 6,
+              padding: '8px 12px',
+              fontSize: 12,
+              color: '#f85149',
+              zIndex: 10,
+              fontWeight: 500,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              boxShadow: '0 0 16px rgba(248,81,73,0.2)',
+            }}>
+              ⚡ 检测到 {scratchLines.length} 条划痕
+              <button
+                onClick={() => setScratchLines([])}
+                style={{
+                  background: 'transparent', border: '1px solid #f85149',
+                  color: '#f85149', fontSize: 10, padding: '2px 6px',
+                  borderRadius: 3, cursor: 'pointer',
+                }}
+              >
+                隐藏
+              </button>
+            </div>
+          )}
         </div>
 
         {showOverlapPanel && selectedBatch && (
@@ -271,6 +321,18 @@ export default function App() {
             mockMode={mockMode}
             mockDefects={mockDefectsRef.current}
             onClose={() => setShowOverlapPanel(false)}
+          />
+        )}
+
+        {showScratchPanel && selectedBatch && (
+          <ScratchDetectionPanel
+            batch={selectedBatch}
+            wafers={wafers}
+            selectedWafer={selectedWafer}
+            mockMode={mockMode}
+            mockDefects={mockDefectsRef.current}
+            onApplyScratches={handleApplyScratches}
+            onClose={() => setShowScratchPanel(false)}
           />
         )}
       </div>

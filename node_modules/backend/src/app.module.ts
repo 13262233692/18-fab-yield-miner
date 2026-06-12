@@ -6,7 +6,7 @@ import { BatchesModule } from './batches/batches.module';
 import { UploadModule } from './upload/upload.module';
 import { TasksModule } from './tasks/tasks.module';
 import { QueueModule } from './queue/queue.module';
-import { BULLMQ_QUEUE } from './queue/queue.module';
+import { AnalysisModule } from './analysis/analysis.module';
 
 @Module({
   imports: [
@@ -43,6 +43,7 @@ import { BULLMQ_QUEUE } from './queue/queue.module';
     }),
     QueueModule,
     TasksModule,
+    AnalysisModule,
     DefectsModule,
     BatchesModule,
     UploadModule,
